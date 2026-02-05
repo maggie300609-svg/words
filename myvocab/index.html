@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>中考1600词全能特训</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@700&display=swap');
+        .font-mono { font-family: 'JetBrains Mono', monospace; }
+        @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-8px); } 75% { transform: translateX(8px); } }
+        .shake { animation: shake 0.4s ease-in-out; }
+        .day-card { transition: all 0.2s; border: 2px solid #f1f5f9; cursor: pointer; border-radius: 20px; -webkit-tap-highlight-color: transparent; }
+        .day-card:active { transform: scale(0.95); background: #f8fafc; }
+        .day-passed { border-color: #10b981 !important; background-color: #f0fdf4 !important; }
+        input:focus { outline: none; border-bottom-color: #6366f1 !important; }
+        body { padding-bottom: env(safe-area-inset-bottom); background-color: #f8fafc; }
+    </style>
+</head>
+<body>
+
+    <!-- 解锁语音权限 -->
+    <div id="unlock-screen" class="fixed inset-0 bg-indigo-600 z-[2000] flex flex-col items-center justify-center text-white p-8">
+        <div class="text-7xl mb-6">📖</div>
+        <h1 class="text-4xl font-black mb-4 tracking-tighter">中考 1600 词</h1>
+        <p class="text-indigo-100 mb-10 text-center text-lg leading-relaxed">欢迎开启通关特训<br>点击下方按钮激活系统语音</p>
+        <button onclick="startApp()" class="bg-white text-indigo-600 px-16 py-4 rounded-2xl font-black text-xl shadow-2xl active:scale-95 transition">进入学习</button>
+    </div>
+
+    <!-- 主界面 -->
+    <div id="app" class="max-w-5xl mx-auto p-4 md:p-8 hidden">
+        <div class="flex flex-col md:flex-row justify-between items-center mb-8 bg-white p-6 rounded-[2rem] shadow-sm gap-4 border border-white">
+            <div class="text-center md:text-left">
+                <h1 class="text-2xl font-black text-indigo-600 italic">VOCAB 1600</h1>
+                <p id="total-progress" class="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">加载进度中...</p>
+            </div>
+            <div class="flex flex-wrap justify-center gap-2">
+                <button onclick="showMistakes()" class="text-xs bg-red-50 text-red-500 px-4 py-2 rounded-full font-bold">错题本 (<span id="m-count">0</span>)</button>
+                <button onclick="openImport()" class="text-xs bg-indigo-50 text-indigo-600 px-4 py-2 rounded-full font-bold">同步词库</button>
+                <button onclick="resetData()" class="text-xs bg-slate-100 text-slate-400 px-4 py-2 rounded-full font-bold">重置</button>
+            </div>
+        </div>
+
+        <div id="view-index" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3"></div>
+
+        <!-- 训练核心 -->
+        <div id="view-session" class="hidden max-w-2xl mx-auto">
+            <div class="flex justify-between items-center mb-4">
+                <button onclick="location.reload()" class="font-bold text-slate-400 p-2">← 退出</button>
+                <div id="phase-badge" class="px-4 py-1 bg-indigo-100 text-indigo-600 rounded-full text-[10px] font-black uppercase">PHASE 1</div>
+            </div>
+            <div class="w-full bg-slate-200 h-1 rounded-full overflow-hidden mb-6"><div id="bar" class="bg-indigo-500 h-full transition-all duration-500 w-0"></div></div>
+            
+            <div class="bg-white rounded-[3rem] shadow-xl p-6 md:p-12 min-h-[450px] flex flex-col items-center justify-center relative border border-white">
+                <div id="counter" class="absolute top-8 left-10 text-[10px] font-mono text-slate-300 font-black tracking-widest">01 / 30</div>
+                
+                <div id="recall-ui" class="w-full text-center">
+                    <h2 id="recall-en" class="text-5xl md:text-6xl font-black text-slate-800 mb-2 font-mono uppercase cursor-pointer" onclick="playVoice()">WORD</h2>
+                    <button onclick="playVoice()" class="mb-10 text-indigo-400 font-bold text-sm">🔊 听读音 (慢速)</button>
+                    <div id="recall-cn-box" class="hidden mb-12 p-8 bg-slate-50 rounded-3xl border border-slate-100"><p id="recall-cn" class="text-2xl font-bold text-indigo-900 leading-tight"></p></div>
+                    <div id="recall-btns" class="grid grid-cols-2 gap-4">
+                        <button onclick="handleRecall(false)" class="py-5 bg-slate-50 text-slate-400 font-bold rounded-2xl">不认识</button>
+                        <button onclick="handleRecall(true)" class="py-5 bg-indigo-600 text-white font-bold rounded-2xl text-lg shadow-lg">认识</button>
+                    </div>
+                    <button id="recall-next" onclick="stepNext()" class="hidden w-full py-5 bg-slate-800 text-white font-bold rounded-2xl text-lg">下一步 (Enter)</button>
+                </div>
+
+                <div id="spell-ui" class="hidden w-full text-center">
+                    <p id="spell-cn" class="text-2xl font-bold text-slate-700 mb-8"></p>
+                    <div id="hint-box" class="mb-8 p-6 bg-slate-50 rounded-3xl min-h-[120px] flex flex-col justify-center border border-slate-100">
+                        <div id="hint-txt" class="text-4xl md:text-5xl font-mono font-bold tracking-[0.2em] text-slate-200 uppercase">_ _ _ _</div>
+                    </div>
+                    <input type="text" id="spell-in" class="w-full border-b-4 border-slate-200 text-3xl md:text-4xl text-center py-4 bg-transparent text-indigo-600 font-mono font-bold" placeholder="请拼写..." autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" enterkeyhint="done">
+                </div>
+            </div>
+        </div>
+
+        <!-- 错题库 -->
+        <div id="view-mistakes" class="hidden">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-black italic">Mistake Library</h2>
+                <button onclick="location.reload()" class="px-6 py-2 bg-slate-800 text-white rounded-xl font-bold">返回</button>
+            </div>
+            <div id="mistake-list" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"></div>
+        </div>
+
+        <!-- 导入 -->
+        <div id="import-modal" class="hidden fixed inset-0 bg-slate-900/80 backdrop-blur-md z-[3000] flex items-center justify-center p-4">
+            <div class="bg-white rounded-[2.5rem] p-8 max-w-2xl w-full shadow-2xl">
+                <h2 class="text-2xl font-black mb-4">同步 1600 词库</h2>
+                <textarea id="import-txt" class="w-full h-80 p-5 bg-slate-50 border rounded-3xl font-mono text-sm mb-6 outline-none focus:border-indigo-500" placeholder="复制PDF全文粘贴于此..."></textarea>
+                <div class="flex justify-center gap-3">
+                    <button onclick="closeImport()" class="px-8 py-2 text-slate-400 font-bold">取消</button>
+                    <button onclick="processImport()" class="px-10 py-2 bg-indigo-600 text-white rounded-2xl font-bold shadow-xl">开始特训</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const STORAGE = { DB: "zk_1600_v_final", PROG: "zk_prog_final", MISTAKES: "zk_mist_final" };
+        let vocab = [], sessionWords = [], mistakesInDay = [];
+        let globalMistakes = JSON.parse(localStorage.getItem(STORAGE.MISTAKES)) || [];
+        let userProgress = JSON.parse(localStorage.getItem(STORAGE.PROGRESS)) || {};
+        let cursor = 0, phase = 1, hintLevel = 0, currentDay = -1;
+
+        // Safari 权限解锁
+        function startApp() {
+            const silent = new SpeechSynthesisUtterance("");
+            window.speechSynthesis.speak(silent);
+            document.getElementById('unlock-screen').classList.add('hidden');
+            document.getElementById('app').classList.remove('hidden');
+            const data = localStorage.getItem(STORAGE.DB);
+            if (data) { vocab = JSON.parse(data); renderIndex(); updateStats(); } else { openImport(); }
+        }
+
+        function processImport() {
+            const raw = document.getElementById('import-txt').value;
+            const res = [];
+            raw.split('\n').forEach(line => {
+                const match = line.trim().match(/^([a-zA-Z\s\(\)\-\.]+)\s+(.*)$/);
+                if (match) res.push({ w: match[1].trim(), d: match[2].trim() });
+            });
+            if (res.length > 0) { localStorage.setItem(STORAGE.DB, JSON.stringify(res)); location.reload(); }
+        }
+
+        function renderIndex() {
+            const container = document.getElementById('view-index');
+            container.innerHTML = "";
+            const totalDays = Math.ceil(vocab.length / 30);
+            for (let i = 0; i < totalDays; i++) {
+                const group = vocab.slice(i * 30, (i + 1) * 30);
+                const s = group[0].w[0].toUpperCase(), e = group[group.length - 1].w[0].toUpperCase();
+                const div = document.createElement('div');
+                div.className = `day-card bg-white p-5 shadow-sm border-2 ${userProgress[i] ? 'day-passed' : 'border-slate-50'}`;
+                div.onclick = () => startSession(i);
+                div.innerHTML = `<div class="text-[10px] font-black text-slate-300 mb-1 font-mono uppercase tracking-widest">Day ${i+1}</div><div class="text-xl font-black">${s === e ? s : s+' - '+e}</div>`;
+                container.appendChild(div);
+            }
+        }
+
+        function startSession(dayIdx) {
+            currentDay = dayIdx;
+            sessionWords = vocab.slice(dayIdx * 30, (dayIdx + 1) * 30);
+            cursor = 0; phase = 1; mistakesInDay = [];
+            updateView('view-session'); showRecall();
+        }
+
+        function showRecall() {
+            const word = sessionWords[cursor];
+            document.getElementById('phase-badge').innerText = `PHASE 1: 认读 (D${currentDay+1})`;
+            document.getElementById('recall-ui').classList.remove('hidden');
+            document.getElementById('spell-ui').classList.add('hidden');
+            document.getElementById('recall-cn-box').classList.add('hidden');
+            document.getElementById('recall-next').classList.add('hidden');
+            document.getElementById('recall-btns').classList.remove('hidden');
+            document.getElementById('recall-w').innerText = word.w;
+            document.getElementById('recall-cn').innerText = word.d;
+            updateUI();
+        }
+
+        function handleRecall(known) {
+            document.getElementById('recall-cn-box').classList.remove('hidden');
+            document.getElementById('recall-next').classList.remove('hidden');
+            document.getElementById('recall-btns').classList.add('hidden');
+            playVoice();
+            if (!known) {
+                recordMistake(sessionWords[cursor]);
+                if (!mistakesInDay.find(m => m.w === sessionWords[cursor].w)) mistakesInDay.push(sessionWords[cursor]);
+            }
+        }
+
+        function stepNext() {
+            cursor++;
+            if (cursor < sessionWords.length) showRecall();
+            else startSpellPhase();
+        }
+
+        function startSpellPhase() {
+            phase = 2; cursor = 0;
+            sessionWords = [...sessionWords].sort(() => Math.random() - 0.5);
+            document.getElementById('phase-badge').innerText = "PHASE 2: 盲打拼写";
+            document.getElementById('recall-ui').classList.add('hidden');
+            document.getElementById('spell-ui').classList.remove('hidden');
+            showSpell();
+        }
+
+        function showSpell() {
+            const list = (phase === 3) ? mistakesInDay : sessionWords;
+            document.getElementById('spell-cn').innerText = list[cursor].d;
+            document.getElementById('spell-in').value = "";
+            hintLevel = 0; updateHintUI(list[cursor].w); updateUI();
+            setTimeout(() => document.getElementById('spell-in').focus(), 300);
+        }
+
+        function checkSpell() {
+            const list = (phase === 3) ? mistakesInDay : sessionWords;
+            const word = list[cursor];
+            if (document.getElementById('spell-in').value.trim().toLowerCase() === word.w.toLowerCase()) {
+                cursor++;
+                if (cursor < list.length) showSpell();
+                else if (phase === 2 && mistakesInDay.length > 0) { phase = 3; cursor = 0; alert("重刷错词！"); showSpell(); }
+                else finishDay();
+            } else {
+                recordMistake(word);
+                if (!mistakesInDay.find(m => m.w === word.w)) mistakesInDay.push(word);
+                document.getElementById('spell-in').classList.add('shake');
+                hintLevel++; updateHintUI(word.w);
+                setTimeout(() => document.getElementById('spell-in').classList.remove('shake'), 400);
+            }
+        }
+
+        function playVoice() {
+            const list = (phase === 1) ? sessionWords : (phase === 3 ? mistakesInDay : sessionWords);
+            let w = list[cursor].w.replace(/\(.*\)/g, "").split(/\s(n|v|a|ad|prep|pron|conj|num|art|int|vi|vt)\./)[0].trim();
+            const msg = new SpeechSynthesisUtterance(w);
+            msg.lang = 'en-US'; msg.rate = 0.55; window.speechSynthesis.cancel(); window.speechSynthesis.speak(msg);
+        }
+
+        function updateHintUI(w) {
+            document.getElementById('hint-txt').innerText = w.split('').map((l, i) => i < hintLevel ? l : '_').join(' ');
+            document.getElementById('hint-txt').className = `text-4xl md:text-6xl font-mono font-bold tracking-[0.2em] uppercase ${hintLevel > 0 ? 'text-red-500' : 'text-slate-200'}`;
+        }
+
+        function updateUI() {
+            const list = (phase === 3) ? mistakesInDay : sessionWords;
+            document.getElementById('bar').style.width = `${(cursor / list.length) * 100}%`;
+            document.getElementById('counter').innerText = `${cursor+1} / ${list.length}`;
+        }
+
+        function recordMistake(w) {
+            if (!globalMistakes.find(m => m.w === w.w)) {
+                globalMistakes.push(w); localStorage.setItem(STORAGE.MISTAKES, JSON.stringify(globalMistakes));
+                updateStats();
+            }
+        }
+
+        function finishDay() {
+            if (currentDay !== -1) { userProgress[currentDay] = true; localStorage.setItem(STORAGE.PROGRESS, JSON.stringify(userProgress)); }
+            alert("训练完成！"); location.reload();
+        }
+
+        function updateStats() {
+            const m = Object.keys(userProgress).length * 30;
+            document.getElementById('total-progress').innerText = `已掌握: ${m} / ${vocab.length} 词`;
+            document.getElementById('m-count').innerText = globalMistakes.length;
+        }
+
+        function showMistakes() {
+            updateView('view-mistakes');
+            document.getElementById('mistake-list').innerHTML = globalMistakes.map(m => `
+                <div class="bg-white p-5 rounded-3xl border flex justify-between items-center shadow-sm">
+                    <div><div class="font-bold text-indigo-600">${m.w}</div><div class="text-xs text-slate-400">${m.d}</div></div>
+                    <button onclick="removeMistake('${m.w}')" class="text-red-400 text-xs font-bold px-2 py-1">移除</button>
+                </div>
+            `).join('');
+        }
+
+        function removeMistake(w) {
+            globalMistakes = globalMistakes.filter(m => m.w !== w);
+            localStorage.setItem(STORAGE.MISTAKES, JSON.stringify(globalMistakes));
+            showMistakes(); updateStats();
+        }
+
+        function startMistakeSession() {
+            if (globalMistakes.length === 0) return;
+            sessionWords = [...globalMistakes].sort(() => Math.random() - 0.5).slice(0, 30);
+            cursor = 0; phase = 2; mistakesInDay = []; currentDay = -1;
+            updateView('view-session'); showSpell();
+        }
+
+        function updateView(id) {
+            ['view-index', 'view-session', 'view-mistakes'].forEach(v => document.getElementById(v).classList.add('hidden'));
+            document.getElementById(id).classList.remove('hidden');
+        }
+
+        function openImport() { document.getElementById('import-modal').classList.remove('hidden'); }
+        function hideImport() { document.getElementById('import-modal').classList.add('hidden'); }
+        function resetData() { if(confirm("确定重置进度？")) { localStorage.removeItem(STORAGE.PROGRESS); location.reload(); } }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                if (phase === 1 && !document.getElementById('recall-next').classList.contains('hidden')) stepNext();
+                else if (phase >= 2) checkSpell();
+            }
+        });
+    </script>
+</body>
+</html>
